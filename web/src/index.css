@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========== JokerPS 亮色清新全局基础 ========== */
+:root {
+  --ah-primary: #1C86E2;
+  --ah-primary-muted: rgba(28, 134, 226, 0.08);
+  --ah-primary-hover: #1675CC;
+  --ah-success: #52C41A;
+  --ah-danger: #FF4D4F;
+  --ah-warning: #FF6600;
+  --ah-info: #1C86E2;
+  --ah-bg-page: #E1E5EB;
+  --ah-bg-white: #FFFFFF;
+  --ah-bg-card: rgba(255, 255, 255, 0.9);
+  --ah-border: rgba(0, 40, 83, 0.08);
+  --ah-border-hover: rgba(0, 40, 83, 0.16);
+  --ah-text-primary: #475669;
+  --ah-text-secondary: #738192;
+  --ah-text-muted: #6B7D93;
+  --ah-code-bg: #1E293B;
+  --ah-code-text: #CDD6F4;
+}
+
+body {
+  margin: 0;
+  font-family: 'Play', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--ah-bg-page);
+  color: var(--ah-text-primary);
+  letter-spacing: -0.005em;
+}
+
+/* ========== 滚动条（亮色适配） ========== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ah-border-hover);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 40, 83, 0.24);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ah-border-hover) transparent;
+}
+
+/* ========== 代码字体 ========== */
+code, pre {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+/* ========== 选中文本 ========== */
+::selection {
+  background: var(--ah-primary);
+  color: #FFFFFF;
+}
+
+/* ========== 焦点环（无障碍 + 风格统一） ========== */
+*:focus-visible {
+  outline: 2px solid var(--ah-primary);
+  outline-offset: 2px;
+}
+
+/* ========== Markdown 预览（亮色适配） ========== */
+.markdown-body h1 { font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem; font-family: 'Play', sans-serif; color: var(--ah-text-primary); }
+.markdown-body h2 { font-size: 1.5rem; font-weight: 700; margin: 1.25rem 0 0.75rem; font-family: 'Play', sans-serif; color: var(--ah-warning); }
+.markdown-body h3 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0 0.5rem; font-family: 'Play', sans-serif; color: var(--ah-text-primary); }
+.markdown-body p { margin: 0.5rem 0; line-height: 1.7; color: var(--ah-text-secondary); }
+.markdown-body ul, .markdown-body ol { padding-left: 1.5rem; margin: 0.5rem 0; color: var(--ah-text-secondary); }
+.markdown-body pre { background: var(--ah-code-bg); color: var(--ah-code-text); padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.75rem 0; border: 1px solid var(--ah-border); }
+.markdown-body code { background: rgba(28, 134, 226, 0.08); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.9em; color: var(--ah-primary); }
+.markdown-body pre code { background: transparent; padding: 0; color: inherit; }
+.markdown-body blockquote { border-left: 3px solid var(--ah-primary); padding-left: 1rem; margin: 0.75rem 0; color: var(--ah-text-secondary); background: rgba(28, 134, 226, 0.03); border-radius: 0 6px 6px 0; }
+.markdown-body table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+.markdown-body th, .markdown-body td { border: 1px solid var(--ah-border); padding: 0.5rem 0.75rem; text-align: left; }
+.markdown-body th { background: rgba(0, 40, 83, 0.04); font-weight: 600; color: var(--ah-text-primary); }
+.markdown-body td { color: var(--ah-text-secondary); }
+.markdown-body a { color: var(--ah-primary); text-decoration: underline; text-underline-offset: 2px; }
+.markdown-body img { max-width: 100%; border-radius: 6px; border: 1px solid var(--ah-border); }
+
+/* ========== 工具类动画 ========== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+.animate-stagger-1 { animation-delay: 0.05s; }
+.animate-stagger-2 { animation-delay: 0.10s; }
+.animate-stagger-3 { animation-delay: 0.15s; }
+.animate-stagger-4 { animation-delay: 0.20s; }
+
+/* 尊重 prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+    opacity: 1;
+  }
+}
