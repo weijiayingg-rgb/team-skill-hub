@@ -20,11 +20,47 @@ const logger = require('../utils/logger');
 const api = require('../api-client');
 const localState = require('../utils/local-state');
 const { computeCollectionHash } = require('../utils/fingerprint');
+const { bundleExpert } = require('../utils/expert-bundler');
 const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
 const semver = require('semver');
 const inquirer = require('inquirer').default || require('inquirer');
+
+/**
+ * 向 FormData 追加文件（Expert 智能打包）
+ *
+ * Expert 类型自动调用 bundleExpert 构建 ZIP；其他类型直接上传原始文件。
+ *
+ * @param {FormData} formData - 表单数据
+ * @param {object} skill - local-state 记录（含 file_paths, type, name）
+ * @returns {{ bundled: boolean, found: number, missing: number } | null}
+ */
+function appendFilesToForm(formData, skill) {
+  const filePaths = skill.file_paths || [];
+
+  if (skill.type === 'expert' && filePaths.length > 0) {
+    const result = bundleExpert(filePaths[0], { type: 'expert' });
+    if (result.isExpert && result.zipBuffer) {
+      formData.append('files', result.zipBuffer, `${skill.name}.zip`);
+      return {
+        bundled: true,
+        found: result.foundSkills.length,
+        missing: result.missingSkills.length,
+        structureLength: result.structure.length,
+      };
+    }
+  }
+
+  // 普通类型 或 Expert 打包失败 → 直接上传文件
+  for (const filePath of filePaths) {
+    if (!fs.existsSync(filePath)) continue;
+    const content = fs.readFileSync(filePath);
+    const filename = path.basename(filePath);
+    formData.append('files', content, filename);
+  }
+  return null;
+}
 
 /**
  * 推送一个 new 资源（首次上传）
@@ -48,13 +84,13 @@ async function pushNew(skill, index, total) {
     formData.append('platforms', JSON.stringify([skill.platform]));
     formData.append('tags', JSON.stringify([]));
 
-    // 添加文件
-    const filePaths = skill.file_paths || [];
-    for (const filePath of filePaths) {
-      if (!fs.existsSync(filePath)) continue;
-      const content = fs.readFileSync(filePath);
-      const filename = path.basename(filePath);
-      formData.append('files', content, filename);
+    // 添加文件（Expert 智能打包）
+    const bundleInfo = appendFilesToForm(formData, skill);
+    if (bundleInfo) {
+      spinner.stop();
+      logger.info(`   📦 Expert 打包: ${bundleInfo.structureLength} 个文件` +
+        (bundleInfo.found > 0 ? `, 包含 ${bundleInfo.found} 个 Skill` : '') +
+        (bundleInfo.missing > 0 ? `, ⚠ ${bundleInfo.missing} 个 Skill 未找到` : ''));
     }
 
     const response = await api.publishResource(formData);
@@ -110,13 +146,8 @@ async function pushUpdate(skill, index, total) {
     formData.append('version', newVersion);
     formData.append('changelog', changelog);
 
-    // 添加更新的文件
-    for (const filePath of filePaths) {
-      if (!fs.existsSync(filePath)) continue;
-      const content = fs.readFileSync(filePath);
-      const filename = path.basename(filePath);
-      formData.append('files', content, filename);
-    }
+    // 添加更新的文件（Expert 智能打包）
+    appendFilesToForm(formData, skill);
 
     const response = await api.addVersion(skill.remote_id, formData);
     const resource = response.data;

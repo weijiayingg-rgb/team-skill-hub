@@ -8,9 +8,6 @@ import ExpertsList from './pages/ExpertsList';
 import TypeBrowse from './pages/TypeBrowse';
 import Profile from './pages/Profile';
 import SyncPage from './pages/SyncPage';
-import ScenesList from './pages/ScenesList';
-import SceneDetail from './pages/SceneDetail';
-import SceneCreate from './pages/SceneCreate';
 import BundleDetail from './pages/BundleDetail';
 import Login from './pages/Login';
 import Leaderboard from './pages/Leaderboard';
@@ -28,9 +25,6 @@ function App() {
         <Route path="/search" element={<SearchResult />} />
         <Route path="/skills" element={<SkillsList />} />
         <Route path="/experts" element={<ExpertsList />} />
-        <Route path="/scenes" element={<ScenesList />} />
-        <Route path="/scenes/:id" element={<SceneDetail />} />
-        <Route path="/scenes/create" element={<SceneCreate />} />
         <Route path="/type/:type" element={<TypeBrowse />} />
         <Route path="/resources/:id" element={<ResourceDetail />} />
         <Route path="/leaderboard" element={<Leaderboard />} />

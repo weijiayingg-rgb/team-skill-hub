@@ -83,7 +83,6 @@ export default function Layout() {
   const navItems = [
     { label: '首页', path: '/' },
     { label: 'Skills', path: '/skills' },
-    { label: '场景', path: '/scenes' },
     { label: 'Experts', path: '/experts' },
     { label: '贡献榜', path: '/leaderboard' },
     { label: '上传', path: '/upload' },

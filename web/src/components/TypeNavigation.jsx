@@ -13,10 +13,7 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import PsychologyIcon from '@mui/icons-material/Psychology';
-import DashboardIcon from '@mui/icons-material/Dashboard';
 import { colors } from '../theme';
-
-const SCENE_ACCENT = '#7C3AED';
 
 export default function TypeNavigation() {
   const navigate = useNavigate();
@@ -47,33 +44,6 @@ export default function TypeNavigation() {
             </Typography>
             <Typography variant="caption" sx={{ color: colors.textMuted }}>
               单文件 AI 技能
-            </Typography>
-          </Box>
-        </Paper>
-
-        {/* 场景胶囊按钮 */}
-        <Paper
-          sx={{
-            flex: 1,
-            p: 2,
-            cursor: 'pointer',
-            bgcolor: colors.bgWhite,
-            border: `1px solid ${colors.border}`,
-            transition: 'all 0.2s',
-            '&:hover': {
-              borderColor: SCENE_ACCENT,
-              boxShadow: '0 2px 8px rgba(124,58,237,0.2)',
-            },
-          }}
-          onClick={() => navigate('/scenes')}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <DashboardIcon sx={{ fontSize: 18, color: SCENE_ACCENT }} />
-            <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: SCENE_ACCENT }}>
-              场景
-            </Typography>
-            <Typography variant="caption" sx={{ color: colors.textMuted }}>
-              企业工作流方案
             </Typography>
           </Box>
         </Paper>

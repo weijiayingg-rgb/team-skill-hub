@@ -1,0 +1,12 @@
+{
+  "name": "skillhub-shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SkillHub 共享规则模块 — Expert 文件识别 + Skill 引用解析的单一规则源",
+  "main": "expert-rules.js",
+  "module": "expert-rules.mjs",
+  "files": [
+    "expert-rules.js",
+    "expert-rules.mjs"
+  ]
+}

@@ -37,6 +37,13 @@ export const colors = {
   // 代码块（保留暗色，代码阅读体验好）
   codeBg: '#1E293B',
   codeText: '#CDD6F4',
+  codeBorder: 'rgba(205, 214, 244, 0.12)',
+  codeHeaderBg: '#181825',
+  codeAccent: '#89B4FA',        // 代码区强调色（链接/标签）
+  codeSubtle: '#A6ADC8',        // 代码区次要文字
+  codeWarning: '#FAB387',       // 代码区警告色（柔和橙）
+  codeWarningBg: 'rgba(250, 179, 135, 0.06)',
+  codeWarningBorder: 'rgba(250, 179, 135, 0.2)',
 };
 
 const theme = createTheme({

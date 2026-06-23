@@ -11,6 +11,7 @@ const fingerprint = require('../../cli/utils/fingerprint');
 const resourceManager = require('../services/resource-manager');
 const { incrementVersion: incrementSemver } = require('../services/resource-manager');
 const resourceModel = require('../models/resources');
+const { parseSkillRefs } = require('../../shared/expert-rules');
 
 /**
  * 计算本地文件集合的哈希值（与 resource-manager.js 的 computeContentHash 对齐）
@@ -491,7 +492,19 @@ router.post('/:id/execute', (req, res, next) => {
         scanItemMap[key] = item;
       }
 
-      // 3. 逐个推送
+      // 预建 Skill 名称映射（供 Expert 打包时 O(1) 查找）
+      const skillByNameMap = {};
+      for (const item of allScanItems) {
+        if (item.type === 'skill') {
+          skillByNameMap[item.name] = item;
+        }
+      }
+
+      // 3. 排序：Skill 优先于 Expert 上传（确保 autoEmbedSkills 能从平台找到刚上传的 Skill）
+      const typePriority = { skill: 0, rules: 1, hook: 2, template: 3, expert: 10, workflow: 5 };
+      validItems.sort((a, b) => (typePriority[a.type] ?? 99) - (typePriority[b.type] ?? 99));
+
+      // 4. 逐个推送
       const results = [];
 
       for (const planItem of validItems) {
@@ -507,6 +520,69 @@ router.post('/:id/execute', (req, res, next) => {
           // 构建文件对象（模拟 multer memoryStorage 格式）
           const files = prepareFiles(scanItem);
 
+          // Expert 打包信息（声明在外部作用域，供后续 status === 'new' 块使用）
+          let expertSkillRefs = [];
+          const embeddedSkillNames = new Set();
+
+          // ── Expert 自动打包引用的 Skill 文件 ──
+          // 从本地扫描结果中找到 Expert 引用的 Skill，直接读取文件打包进 Expert 包
+          // 这解决了"Expert 只上传了 prompt.md，Skill 文件丢失"的核心问题
+          if (planItem.type === 'expert') {
+            // 已有的嵌入 Skill（Expert 目录自带的 skills/*.md）
+            for (const f of files) {
+              if (f.path && f.path.startsWith('skills/') && f.path.endsWith('.md')) {
+                embeddedSkillNames.add(path.basename(f.path, '.md'));
+              }
+            }
+
+            // 从 Expert 的文件中解析 Skill 引用
+            const promptFile = files.find(f =>
+              f.originalname === 'prompt.md' || f.path === 'prompt.md' || f.originalname.endsWith('.md')
+            );
+            if (promptFile && promptFile.buffer) {
+              try {
+                const content = promptFile.buffer.toString('utf-8');
+                const parsed = parseSkillRefs(content);
+                expertSkillRefs = parsed.refs || [];
+              } catch { /* 解析失败不影响主流程 */ }
+            }
+
+            // 从扫描结果中查找引用的 Skill 文件并打包
+            for (const skillName of expertSkillRefs) {
+              if (embeddedSkillNames.has(skillName)) continue; // 已在 Expert 目录中
+
+              // 从扫描结果中查找此 Skill（O(1) 查找）
+              const skillScanItem = skillByNameMap[skillName] || null;
+
+              if (skillScanItem && skillScanItem.files && skillScanItem.files.length > 0) {
+                // 读取 Skill 的主 .md 文件
+                const skillFilePath = skillScanItem.files.find(f => f.endsWith('.md')) || skillScanItem.files[0];
+                try {
+                  const resolved = path.resolve(skillFilePath);
+                  const homeDir = os.homedir();
+                  if (resolved.startsWith(homeDir) && !skillFilePath.includes('..') && fs.statSync(resolved).isFile()) {
+                    const skillContent = fs.readFileSync(resolved);
+                    files.push({
+                      originalname: `${skillName}.md`,
+                      buffer: skillContent,
+                      path: `skills/${skillName}.md`,
+                    });
+                    embeddedSkillNames.add(skillName);
+                    console.log(`[sync-execute] Expert "${planItem.name}" 自动打包 Skill "${skillName}" ← ${skillFilePath}`);
+                  }
+                } catch (e) {
+                  console.warn(`[sync-execute] 打包 Skill "${skillName}" 失败:`, e.message);
+                }
+              }
+            }
+
+            // 记录未能打包的 Skill 引用（供结果展示）
+            const unbundled = expertSkillRefs.filter(r => !embeddedSkillNames.has(r));
+            if (unbundled.length > 0 && expertSkillRefs.length > 0) {
+              console.log(`[sync-execute] Expert "${planItem.name}" 未打包的 Skill: ${unbundled.join(', ')}`);
+            }
+          }
+
           if (planItem.status === 'new') {
             // ── 新增资源 ──
             const metadata = {
@@ -519,14 +595,21 @@ router.post('/:id/execute', (req, res, next) => {
               platform: planItem.platform,  // 记录来源平台，区分不同平台的同名资源
             };
             const created = await resourceManager.create(metadata, files);
-            results.push({
+
+            // Expert 结果附加 Skill 打包信息
+            const resultEntry = {
               success: true,
               name: planItem.name,
               displayName: planItem.displayName,
               action: '创建新资源',
               id: created.id,
               version: created.current_version,
-            });
+            };
+            if (planItem.type === 'expert' && expertSkillRefs.length > 0) {
+              resultEntry.bundledSkills = [...embeddedSkillNames];
+              resultEntry.unbundledSkills = expertSkillRefs.filter(r => !embeddedSkillNames.has(r));
+            }
+            results.push(resultEntry);
 
           } else if (planItem.status === 'updated') {
             // ── 更新资源：添加新版本 ──
@@ -563,6 +646,55 @@ router.post('/:id/execute', (req, res, next) => {
 
           } else {
             results.push({ success: false, name: planItem.name, displayName: planItem.displayName, error: `不支持的状态: ${planItem.status}` });
+          }
+
+          // ── Expert 上传后自动为打包的 Skill 创建独立资源 ──
+          // 适用于 new 和 updated 两种状态：只要 Expert 成功上传，其引用的 Skill
+          // 如果平台上不存在就自动创建。创建后独立 Skill 有自己的版本线，不与 Expert 联动。
+          if (planItem.type === 'expert' && embeddedSkillNames.size > 0) {
+            for (const skillName of embeddedSkillNames) {
+              const existingSkill = resourceModel.findByName(skillName);
+              if (existingSkill && existingSkill.type === 'skill') continue;
+
+              const skillScanItem = skillByNameMap[skillName];
+              if (!skillScanItem || !skillScanItem.files || skillScanItem.files.length === 0) continue;
+
+              try {
+                const skillFilePath = skillScanItem.files.find(f => f.endsWith('.md')) || skillScanItem.files[0];
+                const resolved = path.resolve(skillFilePath);
+                const homeDir = os.homedir();
+                if (!resolved.startsWith(homeDir) || skillFilePath.includes('..')) continue;
+                if (!fs.statSync(resolved).isFile()) continue;
+
+                const skillContent = fs.readFileSync(resolved);
+                const skillMeta = {
+                  name: skillName,
+                  display_name: skillScanItem.displayName || skillName,
+                  type: 'skill',
+                  description: `由 Expert "${planItem.displayName || planItem.name}" 自动关联创建`,
+                  author_id: session.user_id,
+                  tags: ['auto-generated'],
+                  platform: planItem.platform,
+                };
+                const createdSkill = await resourceManager.create(skillMeta, [{
+                  originalname: `${skillName}.md`,
+                  buffer: skillContent,
+                  path: `${skillName}.md`,
+                }]);
+                results.push({
+                  success: true,
+                  name: skillName,
+                  displayName: skillScanItem.displayName || skillName,
+                  action: '自动创建（Expert 引用）',
+                  id: createdSkill.id,
+                  version: createdSkill.current_version,
+                  autoCreated: true,
+                });
+                console.log(`[sync-execute] 自动创建 Skill "${skillName}" ← Expert "${planItem.name}"`);
+              } catch (e) {
+                console.warn(`[sync-execute] 自动创建 Skill "${skillName}" 失败:`, e.message);
+              }
+            }
           }
         } catch (err) {
           results.push({

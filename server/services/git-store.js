@@ -51,10 +51,24 @@ class GitStore {
 
   /**
    * 写入资源文件（支持子目录路径，如 skills/review.md）
+   *
+   * 安全防护：拒绝路径遍历（..）和路径逃逸
    */
   async writeResourceFile(resourceName, version, filename, content) {
+    // zip-slip 防护：不允许 .. 出现在 filename 中
+    if (filename.includes('..')) {
+      throw new Error(`拒绝路径遍历: ${filename}`);
+    }
+
     const versionDir = await this.ensureResourceDir(resourceName, version);
     const filePath = path.join(versionDir, filename);
+
+    // 二次校验：确保最终路径仍在 versionDir 内
+    const resolved = path.resolve(filePath);
+    if (!resolved.startsWith(path.resolve(versionDir))) {
+      throw new Error(`路径逃逸: ${filePath}`);
+    }
+
     // 确保子目录存在
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) {

@@ -40,6 +40,49 @@ async function install(name, options) {
       platform = selected;
     }
 
+    // 获取适配器
+    const { getAdapter } = getAdapterModule();
+    const adapter = getAdapter(platform);
+    const basePath = getBasePath();
+
+    // ═══ Expert 冲突检测 ═══
+    const skillRefs = resource.skill_refs || [];
+    if (resource.type === 'expert' && skillRefs.length > 0 && !yes) {
+      const conflictResult = await adapter.checkSkillConflicts(
+        basePath,
+        skillRefs.map(r => typeof r === 'string' ? r : r.skill_name)
+      );
+
+      if (conflictResult.hasConflicts) {
+        logger.warn(`\n⚠ 检测到 ${conflictResult.conflicts.length} 个 Skill 冲突：`);
+        for (const c of conflictResult.conflicts) {
+          logger.warn(`  • ${c.name} — 已被「${c.installedBy}」安装（v${c.version}）`);
+        }
+
+        const { action } = await inquirer.prompt([{
+          type: 'list',
+          name: 'action',
+          message: '如何处理冲突的 Skill？',
+          choices: [
+            { name: '跳过冲突的 Skill（保留现有版本）', value: 'skip' },
+            { name: '覆盖所有冲突的 Skill（用 Expert 的版本替换）', value: 'overwrite' },
+            { name: '取消安装', value: 'cancel' },
+          ],
+        }]);
+
+        if (action === 'cancel') {
+          logger.info('已取消安装');
+          return;
+        }
+
+        if (action === 'skip') {
+          // 过滤掉冲突的 Skill，不安装它们
+          resource._skipSkillRefs = conflictResult.conflicts.map(c => c.name);
+          logger.info(`已跳过 ${resource._skipSkillRefs.length} 个冲突的 Skill`);
+        }
+      }
+    }
+
     // 确认安装
     if (!yes) {
       const { confirm } = await inquirer.prompt([{
@@ -69,9 +112,6 @@ async function install(name, options) {
 
     // 安装到目标平台
     const installSpinner = logger.spinner(`正在安装到 ${platform}...`);
-    const { getAdapter } = getAdapterModule();
-    const adapter = getAdapter(platform);
-    const basePath = getBasePath();
 
     const installResult = await adapter.install({
       type: resource.type,
@@ -79,6 +119,9 @@ async function install(name, options) {
       display_name: resource.display_name,
       description: resource.description,
       files: files,
+      version: resource.current_version,
+      skill_refs: resource.skill_refs || [],
+      _skipSkillRefs: resource._skipSkillRefs || [],
       metadata: resource,
     }, basePath);
 
@@ -91,6 +134,17 @@ async function install(name, options) {
     logger.info(`  路径: ${installResult.installedPath}`);
     if (installResult.convertedFiles.length > 0) {
       logger.info(`  文件数: ${installResult.convertedFiles.length}`);
+      // 显示跳过的文件
+      const skipped = installResult.convertedFiles.filter(f => f.startsWith('[跳过]'));
+      if (skipped.length > 0) {
+        logger.warn(`  跳过: ${skipped.length} 个文件（冲突保护）`);
+      }
+    }
+
+    // 输出使用指引（如果适配器提供了 usageGuide 字段）
+    // 向后兼容：旧版适配器可能没有此字段，不影响已有逻辑
+    if (installResult.usageGuide) {
+      logger.info(installResult.usageGuide);
     }
 
   } catch (err) {

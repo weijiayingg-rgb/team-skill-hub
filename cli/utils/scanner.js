@@ -61,15 +61,18 @@ function isRealDirectory(fullPath) {
 /**
  * 扫描 Claude Code 平台（skill 和 expert）
  *
- * 官方路径（与适配器对齐）：
- *   - skills: ~/.claude/commands/{name}.md（自定义 slash 命令）
- *   - experts: ~/.claude/agents/{name}.md 或 {name}/（Agent 定义）
+ * 覆盖两种 Skill 格式：
+ *   - 标准格式: ~/.claude/commands/{name}.md（自定义 slash 命令）
+ *   - cc-switch 格式: ~/.claude/skills/{name}/index.md
+ *
+ * Expert 格式:
+ *   - ~/.claude/agents/{name}.md 或 {name}/（Agent 定义）
  */
 function scanClaudeCode() {
   const home = getHomeDir();
   const items = [];
 
-  // 扫描 skills: ~/.claude/commands/*.md（自定义 slash 命令）
+  // 扫描 skills 格式 1: ~/.claude/commands/*.md（自定义 slash 命令）
   const commandsDir = resolvePath(home, '.claude', 'commands');
   if (commandsDir) {
     try {
@@ -86,6 +89,33 @@ function scanClaudeCode() {
             displayName: skillName,
             files: [filePath],
           });
+        }
+      }
+    } catch {
+      // 读取目录失败，静默跳过
+    }
+  }
+
+  // 扫描 skills 格式 2: ~/.claude/skills/{name}/index.md（cc-switch 格式）
+  const skillsDir = resolvePath(home, '.claude', 'skills');
+  if (skillsDir) {
+    try {
+      const entries = fs.readdirSync(skillsDir);
+      for (const name of entries) {
+        if (name.startsWith('.')) continue;
+        const skillDirPath = path.join(skillsDir, name);
+        if (isRealDirectory(skillDirPath)) {
+          // 收集该 skill 目录下的所有文件
+          const files = collectDirFiles(skillDirPath);
+          if (files.length > 0) {
+            items.push({
+              platform: 'claude-code',
+              type: 'skill',
+              name,
+              displayName: name,
+              files,
+            });
+          }
         }
       }
     } catch {
@@ -592,7 +622,24 @@ function scanAll(options = {}) {
     items = items.filter(item => item.type === type);
   }
 
-  return items;
+  // 去重：同一平台下 name+type 重复时，保留 skills/ 格式（文件更多、结构更完整）
+  const seen = new Map();
+  for (const item of items) {
+    const key = `${item.platform}:${item.type}:${item.name}`;
+    const existing = seen.get(key);
+    if (!existing) {
+      seen.set(key, item);
+    } else {
+      // 优先保留 skills/ 目录格式的条目（文件数更多）
+      const existingIsSkills = existing.files?.some(f => f.includes('/skills/'));
+      const currentIsSkills = item.files?.some(f => f.includes('/skills/'));
+      if (currentIsSkills && !existingIsSkills) {
+        seen.set(key, item);
+      }
+    }
+  }
+
+  return [...seen.values()];
 }
 
 module.exports = { scanAll, scanClaudeCode, scanCursor, scanCodex, scanWorkBuddy, resolvePlatform };

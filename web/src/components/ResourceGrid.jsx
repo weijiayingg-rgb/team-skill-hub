@@ -9,7 +9,7 @@ import ResourceCard from './ResourceCard';
 import ExpertCard from './ExpertCard';
 import { colors } from '../theme';
 
-export default function ResourceGrid({ resources, loading, error, emptyText = '暂无资源' }) {
+export default function ResourceGrid({ resources, loading, error, emptyText = '暂无资源', onDelete }) {
   if (loading) {
     return (
       <Box
@@ -80,8 +80,8 @@ export default function ResourceGrid({ resources, loading, error, emptyText = '�
     >
       {resources.map(resource => (
         resource.type === 'expert'
-          ? <ExpertCard key={resource.id} resource={resource} />
-          : <ResourceCard key={resource.id} resource={resource} />
+          ? <ExpertCard key={resource.id} resource={resource} onDelete={onDelete} />
+          : <ResourceCard key={resource.id} resource={resource} onDelete={onDelete} />
       ))}
     </Box>
   );

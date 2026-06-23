@@ -14,14 +14,16 @@ import CardContent from '@mui/material/CardContent';
 import CardActionArea from '@mui/material/CardActionArea';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import ThumbUp from '@mui/icons-material/ThumbUp';
 import Favorite from '@mui/icons-material/Favorite';
 import Download from '@mui/icons-material/Download';
+import DeleteIcon from '@mui/icons-material/Delete';
 import TypeBadge from './TypeBadge';
 import TagChip from './TagChip';
 import { formatNumber, formatDateRelative } from '../utils/format';
-import { getTypeMeta } from '../utils/constants';
+import { getTypeMeta, PLATFORM_CONFIG } from '../utils/constants';
 import { colors } from '../theme';
 
 // 安全解析 JSON 字符串，失败时返回空数组
@@ -41,7 +43,7 @@ function getTagsArray(resource) {
   return [];
 }
 
-export default function ResourceCard({ resource }) {
+export default function ResourceCard({ resource, onDelete }) {
   const navigate = useNavigate();
   const typeInfo = getTypeMeta(resource.type);
   const accent = typeInfo?.accent || colors.textMuted;
@@ -65,6 +67,23 @@ export default function ResourceCard({ resource }) {
         },
       }}
     >
+      {/* 删除按钮（仅当 onDelete 传入时显示） */}
+      {onDelete && (
+        <IconButton
+          size="small"
+          onClick={(e) => { e.stopPropagation(); onDelete(resource); }}
+          sx={{
+            position: 'absolute',
+            top: 4,
+            right: 4,
+            zIndex: 2,
+            color: colors.textMuted,
+            '&:hover': { color: colors.danger, bgcolor: 'rgba(239,68,68,0.08)' },
+          }}
+        >
+          <DeleteIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+      )}
       <CardActionArea onClick={() => navigate(`/resources/${resource.id}`)} sx={{ height: '100%' }}>
         <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
           {/* 标题行 */}
@@ -85,6 +104,49 @@ export default function ResourceCard({ resource }) {
             </Typography>
             <TypeBadge type={resource.type} />
           </Box>
+
+          {/* 元信息条 */}
+          {(() => {
+            const tags = getTagsArray(resource);
+            const firstTag = tags[0];
+            const platform = resource.platform ? PLATFORM_CONFIG[resource.platform] : null;
+            const authorName = resource.author_name || resource.author?.display_name;
+
+            if (!firstTag && !platform && !authorName) return null;
+
+            return (
+              <Box sx={{
+                display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5, flexWrap: 'wrap',
+              }}>
+                {firstTag && (
+                  <Box sx={{
+                    fontSize: '0.7rem', fontWeight: 500,
+                    color: accent, bgcolor: `${accent}14`,
+                    px: 0.8, py: 0.2, borderRadius: 1,
+                    fontFamily: '"JetBrains Mono", monospace',
+                  }}>
+                    {firstTag}
+                  </Box>
+                )}
+                {platform && (
+                  <Typography variant="caption" sx={{
+                    color: colors.textMuted, fontSize: '0.7rem',
+                    display: 'flex', alignItems: 'center', gap: 0.3,
+                  }}>
+                    🖥 {platform.name}
+                  </Typography>
+                )}
+                {authorName && (
+                  <Typography variant="caption" sx={{
+                    color: colors.textMuted, fontSize: '0.7rem',
+                    display: 'flex', alignItems: 'center', gap: 0.3,
+                  }}>
+                    👤 {authorName}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })()}
 
           {/* 描述 */}
           <Typography

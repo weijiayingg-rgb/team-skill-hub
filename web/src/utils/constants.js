@@ -12,27 +12,7 @@ export const RESOURCE_TYPES = [
     accent: '#FF6600',
     badge: { bg: 'rgba(255, 102, 0, 0.08)', text: '#E65C00', border: 'rgba(255, 102, 0, 0.2)' },
   },
-  {
-    key: 'scene', label: '场景', icon: 'Dashboard',
-    desc: '企业工作流场景方案',
-    accent: '#7C3AED',
-    badge: { bg: 'rgba(124, 58, 237, 0.08)', text: '#6D28D9', border: 'rgba(124, 58, 237, 0.2)' },
-  },
 ];
-
-// 标签分类
-export const TAG_CATEGORIES = [
-  { key: 'general', label: '通用', color: '#6B7280' },
-  { key: 'team', label: '团队', color: '#2563EB' },
-  { key: 'tool', label: '工具', color: '#059669' },
-  { key: 'workflow', label: '流程', color: '#D97706' },
-];
-
-// 获取标签分类颜色
-export function getTagCategoryColor(category) {
-  const cat = TAG_CATEGORIES.find(c => c.key === category);
-  return cat ? cat.color : TAG_CATEGORIES[0].color;
-}
 
 // 查找类型元数据的快捷方法
 export function getTypeMeta(typeKey) {

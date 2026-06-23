@@ -144,6 +144,18 @@ function runMigrations(db) {
     );
   `);
 
+  // Expert 引用的 Skill 关联表（引用模型：Expert 不内嵌 Skill 文件，只记录引用关系）
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS expert_skill_refs (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      expert_id   INTEGER NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+      skill_name  TEXT    NOT NULL,
+      skill_id    INTEGER REFERENCES resources(id) ON DELETE SET NULL,
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(expert_id, skill_name)
+    );
+  `);
+
   // 配置表
   db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -191,6 +203,8 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_resource_tags_tag ON resource_tags(tag_id);
     CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_id, is_read, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_notifications_resource ON notifications(resource_id);
+    CREATE INDEX IF NOT EXISTS idx_expert_skill_refs_expert ON expert_skill_refs(expert_id);
+    CREATE INDEX IF NOT EXISTS idx_expert_skill_refs_skill  ON expert_skill_refs(skill_id);
   `);
 
   // sync_sessions 列安全迁移（兼容已有数据库）
@@ -229,49 +243,16 @@ function runMigrations(db) {
     if (!cols.some(c => c.name === 'platform')) {
       db.exec(`ALTER TABLE resources ADD COLUMN platform TEXT DEFAULT NULL`);
     }
-  } catch (e) {
-    // 忽略迁移错误
-  }
-
-  // 安全添加 tags.category 列
-  try {
-    const tagCols = db.prepare("PRAGMA table_info(tags)").all();
-    if (!tagCols.some(c => c.name === 'category')) {
-      db.exec(`ALTER TABLE tags ADD COLUMN category TEXT NOT NULL DEFAULT 'general'`);
+    // Expert 技能/工具数量缓存列（避免列表接口每次读 Git）
+    if (!cols.some(c => c.name === 'skill_count')) {
+      db.exec(`ALTER TABLE resources ADD COLUMN skill_count INTEGER NOT NULL DEFAULT 0`);
+    }
+    if (!cols.some(c => c.name === 'tool_count')) {
+      db.exec(`ALTER TABLE resources ADD COLUMN tool_count INTEGER NOT NULL DEFAULT 0`);
     }
   } catch (e) {
     // 忽略迁移错误
   }
-
-  // 场景表（Scene）：企业工作流场景 = Rules + Skills + Hook 的组合
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS scenes (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      name            TEXT    NOT NULL UNIQUE,
-      display_name    TEXT    NOT NULL,
-      description     TEXT    DEFAULT '',
-      author_id       INTEGER NOT NULL REFERENCES users(id),
-      rules_id        INTEGER REFERENCES resources(id),
-      skills          TEXT    NOT NULL DEFAULT '[]',
-      hooks_id        INTEGER REFERENCES resources(id),
-      version         TEXT    NOT NULL DEFAULT '1.0.0',
-      tags            TEXT    DEFAULT '[]',
-      download_count  INTEGER NOT NULL DEFAULT 0,
-      like_count      INTEGER NOT NULL DEFAULT 0,
-      hot_score       REAL    NOT NULL DEFAULT 0.0,
-      status          TEXT    NOT NULL DEFAULT 'published',
-      created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-      updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
-
-  // 场景索引
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_scenes_author ON scenes(author_id);
-    CREATE INDEX IF NOT EXISTS idx_scenes_hot    ON scenes(hot_score DESC);
-    CREATE INDEX IF NOT EXISTS idx_scenes_status ON scenes(status);
-    CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category);
-  `);
 
   // content_hash 索引
   db.exec(`

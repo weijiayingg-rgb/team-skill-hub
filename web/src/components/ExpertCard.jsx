@@ -14,9 +14,12 @@ import CardContent from '@mui/material/CardContent';
 import CardActionArea from '@mui/material/CardActionArea';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
+import Skeleton from '@mui/material/Skeleton';
 import ThumbUp from '@mui/icons-material/ThumbUp';
 import Download from '@mui/icons-material/Download';
+import DeleteIcon from '@mui/icons-material/Delete';
 import TypeBadge from './TypeBadge';
 import TagChip from './TagChip';
 import { formatNumber } from '../utils/format';
@@ -36,7 +39,7 @@ function truncateDescription(desc, maxLength = 100) {
   return desc.slice(0, maxLength - 1).trim() + '…';
 }
 
-export default function ExpertCard({ resource }) {
+export default function ExpertCard({ resource, onDelete }) {
   const navigate = useNavigate();
   const typeInfo = getTypeMeta(resource.type);
   const accent = typeInfo?.accent || colors.textMuted;
@@ -70,6 +73,23 @@ export default function ExpertCard({ resource }) {
         },
       }}
     >
+      {/* 删除按钮（仅当 onDelete 传入时显示） */}
+      {onDelete && (
+        <IconButton
+          size="small"
+          onClick={(e) => { e.stopPropagation(); onDelete(resource); }}
+          sx={{
+            position: 'absolute',
+            top: 4,
+            right: 4,
+            zIndex: 2,
+            color: colors.textMuted,
+            '&:hover': { color: colors.danger, bgcolor: 'rgba(239,68,68,0.08)' },
+          }}
+        >
+          <DeleteIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+      )}
       <CardActionArea onClick={() => navigate(`/resources/${resource.id}`)} sx={{ height: '100%' }}>
         <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column', height: '100%', gap: 1 }}>
           {/* 标题行 + 类型徽章 */}
@@ -90,6 +110,39 @@ export default function ExpertCard({ resource }) {
             </Typography>
             <TypeBadge type={resource.type} />
           </Box>
+
+          {/* 元信息条 */}
+          {(() => {
+            const firstTag = tags[0];
+            const authorName = resource.author_name || resource.author?.display_name;
+
+            if (!firstTag && !authorName) return null;
+
+            return (
+              <Box sx={{
+                display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5, flexWrap: 'wrap',
+              }}>
+                {firstTag && (
+                  <Box sx={{
+                    fontSize: '0.7rem', fontWeight: 500,
+                    color: accent, bgcolor: `${accent}14`,
+                    px: 0.8, py: 0.2, borderRadius: 1,
+                    fontFamily: '"JetBrains Mono", monospace',
+                  }}>
+                    {firstTag}
+                  </Box>
+                )}
+                {authorName && (
+                  <Typography variant="caption" sx={{
+                    color: colors.textMuted, fontSize: '0.7rem',
+                    display: 'flex', alignItems: 'center', gap: 0.3,
+                  }}>
+                    👤 {authorName}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })()}
 
           {/* 一句话定位 */}
           {shortDesc && (
@@ -155,6 +208,22 @@ export default function ExpertCard({ resource }) {
 
             {/* 热度指标 */}
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              {/* Expert 技能/工具数量指标（仅 expert 类型且有技能时显示） */}
+              {resource.type === 'expert' && (resource.skill_count > 0 || resource.tool_count > 0) && (
+                <Typography
+                  sx={{
+                    fontSize: '0.7rem',
+                    color: colors.textMuted,
+                    fontFamily: '"JetBrains Mono", monospace',
+                    fontWeight: 500,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {resource.skill_count > 0 && `🔧 ${resource.skill_count} 技能`}
+                  {resource.skill_count > 0 && resource.tool_count > 0 && ' · '}
+                  {resource.tool_count > 0 && `🛠 ${resource.tool_count} 工具`}
+                </Typography>
+              )}
               <Tooltip title="下载">
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3, color: colors.textMuted, fontSize: '0.75rem' }}>
                   <Download sx={{ fontSize: 13 }} />

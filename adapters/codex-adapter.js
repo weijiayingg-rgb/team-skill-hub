@@ -31,6 +31,11 @@ class CodexAdapter extends PlatformAdapter {
     return path.join(basePath, '.codex');
   }
 
+  /** 清单文件存放在 .codex 目录下 */
+  _getPlatformManifestPath(basePath) {
+    return path.join(this._getConfigDir(basePath), '.skillhub.json');
+  }
+
   async install(resource, basePath) {
     const configDir = this._getConfigDir(basePath);
     const convertedFiles = [];
@@ -97,7 +102,12 @@ class CodexAdapter extends PlatformAdapter {
         convertedFiles.push(filePath);
       }
 
-      return { installedPath: commandsDir, convertedFiles };
+      // usageGuide: 安装后提示用户如何在 Codex 中调用该 Skill
+      return {
+        installedPath: commandsDir,
+        convertedFiles,
+        usageGuide: `✅ 已安装。在 Codex 中使用 /${resource.name} 调用。`,
+      };
     }
 
     // Expert 类型 → 安装到 agents 目录
@@ -128,7 +138,19 @@ class CodexAdapter extends PlatformAdapter {
         convertedFiles.push(filePath);
       }
 
-      return { installedPath: agentsDir, convertedFiles };
+      // 写入清单
+      await this._addToManifest(basePath, resource.name, {
+        type: 'expert',
+        version: resource.version || resource.current_version || '1.0.0',
+        skillRefs: (resource.skill_refs || []).map(r => typeof r === 'string' ? r : (r.skill_name || r)),
+      });
+
+      // usageGuide: 安装后提示用户如何在 Codex 中激活该 Expert
+      return {
+        installedPath: agentsDir,
+        convertedFiles,
+        usageGuide: `✅ 已安装。在 Codex 中使用 /${resource.name} 激活此专家。`,
+      };
     }
 
     // 未知类型，默认安装到 commands 目录
@@ -199,6 +221,7 @@ class CodexAdapter extends PlatformAdapter {
         );
         content = content.replace(regex, '').trim();
         await fs.writeFile(rulesMdPath, content + '\n', 'utf-8');
+        await this._removeFromManifest(basePath, resourceName);
         return { removed: true, removedPath: rulesMdPath };
       }
     } catch {
@@ -213,6 +236,7 @@ class CodexAdapter extends PlatformAdapter {
         if (file.startsWith(resourceName)) {
           const filePath = path.join(commandsDir, file);
           await fs.unlink(filePath);
+          await this._removeFromManifest(basePath, resourceName);
           return { removed: true, removedPath: filePath };
         }
       }
@@ -228,6 +252,7 @@ class CodexAdapter extends PlatformAdapter {
         if (file.startsWith(resourceName)) {
           const filePath = path.join(agentsDir, file);
           await fs.unlink(filePath);
+          await this._removeFromManifest(basePath, resourceName);
           return { removed: true, removedPath: filePath };
         }
       }

@@ -53,6 +53,11 @@ class WorkBuddyAdapter extends PlatformAdapter {
     return path.join(basePath, '.workbuddy');
   }
 
+  /** 清单文件存放在 .workbuddy 目录下 */
+  _getPlatformManifestPath(basePath) {
+    return path.join(this._getConfigDir(basePath), '.skillhub.json');
+  }
+
   async install(resource, basePath) {
     const configDir = this._getConfigDir(basePath);
     const typeDir = this._getTypeDir(resource.type);
@@ -84,9 +89,22 @@ class WorkBuddyAdapter extends PlatformAdapter {
     await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
     convertedFiles.push(configPath);
 
+    // 写入全局清单
+    await this._addToManifest(basePath, resource.name, {
+      type: resource.type,
+      version: resource.version || resource.current_version || '1.0.0',
+      skillRefs: (resource.skill_refs || []).map(r => typeof r === 'string' ? r : (r.skill_name || r)),
+    });
+
+    // usageGuide: 根据资源类型生成对应平台的使用指引
+    const usageGuide = resource.type === 'expert'
+      ? `✅ 已安装。在 WorkBuddy 的 Expert 面板中找到并使用 ${resource.name}。`
+      : `✅ 已安装。在 WorkBuddy 中使用 /${resource.name} 调用。`;
+
     return {
       installedPath: resourceDir,
       convertedFiles,
+      usageGuide,
     };
   }
 
@@ -112,6 +130,7 @@ class WorkBuddyAdapter extends PlatformAdapter {
       try {
         await fs.access(resourceDir);
         await fs.rm(resourceDir, { recursive: true, force: true });
+        await this._removeFromManifest(basePath, resourceName);
         return { removed: true, removedPath: resourceDir };
       } catch {
         // 目录不存在，继续检查下一个

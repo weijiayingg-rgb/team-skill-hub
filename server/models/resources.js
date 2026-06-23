@@ -3,7 +3,7 @@ const { getDb } = require('./db');
 class ResourceModel {
   findAll(filters = {}) {
     const db = getDb();
-    const { type, types, status = 'published', sort = 'hot', order = 'desc', page = 1, pageSize = 20, q, tag, tag_category } = filters;
+    const { type, types, status = 'published', sort = 'hot', order = 'desc', page = 1, pageSize = 20, q, tag } = filters;
     const limit = Math.min(pageSize, 100);
     const offset = (page - 1) * limit;
 
@@ -26,12 +26,6 @@ class ResourceModel {
     if (tag) {
       where.push(`r.id IN (SELECT rt.resource_id FROM resource_tags rt JOIN tags t ON rt.tag_id = t.id WHERE t.name = ?)`);
       params.push(tag);
-    }
-
-    // 按标签分类筛选
-    if (tag_category) {
-      where.push(`r.id IN (SELECT rt.resource_id FROM resource_tags rt JOIN tags t ON rt.tag_id = t.id WHERE t.category = ?)`);
-      params.push(tag_category);
     }
 
     // 先尝试 FTS5 全文搜索
@@ -135,7 +129,7 @@ class ResourceModel {
     const fields = [];
     const params = [];
 
-    const allowedFields = ['display_name', 'type', 'description', 'current_version', 'tags', 'status', 'git_path', 'files', 'content_hash', 'platform'];
+    const allowedFields = ['display_name', 'type', 'description', 'current_version', 'tags', 'status', 'git_path', 'files', 'content_hash', 'platform', 'skill_count', 'tool_count'];
     for (const field of allowedFields) {
       if (data[field] !== undefined) {
         const val = (field === 'tags' || field === 'files') ? JSON.stringify(data[field]) : data[field];

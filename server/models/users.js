@@ -1,5 +1,17 @@
 const { getDb } = require('./db');
 
+function deserializeResources(rows) {
+  return rows.map(row => ({
+    ...row,
+    tags: safeParse(row.tags, []),
+    files: safeParse(row.files, []),
+  }));
+}
+
+function safeParse(str, defaultVal) {
+  try { return JSON.parse(str); } catch { return defaultVal; }
+}
+
 class UserModel {
   findAll() {
     const db = getDb();
@@ -52,27 +64,27 @@ class UserModel {
       sql = 'SELECT * FROM resources WHERE author_id = ? AND type = ? ORDER BY created_at DESC';
       params.push(type);
     }
-    return db.prepare(sql).all(...params);
+    return deserializeResources(db.prepare(sql).all(...params));
   }
 
   getFavorites(userId) {
     const db = getDb();
-    return db.prepare(`
+    return deserializeResources(db.prepare(`
       SELECT r.* FROM resources r
       JOIN interactions i ON r.id = i.resource_id AND i.type = 'favorite'
       WHERE i.user_id = ?
       ORDER BY i.created_at DESC
-    `).all(userId);
+    `).all(userId));
   }
 
   getDownloads(userId) {
     const db = getDb();
-    return db.prepare(`
+    return deserializeResources(db.prepare(`
       SELECT r.* FROM resources r
       JOIN interactions i ON r.id = i.resource_id AND i.type = 'download'
       WHERE i.user_id = ?
       ORDER BY i.created_at DESC
-    `).all(userId);
+    `).all(userId));
   }
 
   getStats(userId) {

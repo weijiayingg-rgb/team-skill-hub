@@ -9,6 +9,7 @@ data/agenthub.db*
 data/agenthub-registry/
 data/skillhub-registry/
 data/uploads/
+server/data/
 .DS_Store
 *.log
 coverage/

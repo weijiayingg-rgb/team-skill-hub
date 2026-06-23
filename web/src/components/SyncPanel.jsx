@@ -20,6 +20,8 @@ import Paper from '@mui/material/Paper';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
 import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
@@ -32,8 +34,10 @@ import SyncIcon from '@mui/icons-material/Sync';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import UpdateIcon from '@mui/icons-material/Update';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import SearchIcon from '@mui/icons-material/Search';
 import apiClient from '../api/client';
 import { colors } from '../theme';
+import TypeBadge from './TypeBadge';
 
 // 状态常量
 const SYNC_STATES = {
@@ -82,6 +86,7 @@ export default function SyncPanel({ initialSessionId }) {
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [pushResult, setPushResult] = useState(null);
+  const [searchText, setSearchText] = useState(''); // 搜索过滤
 
   // 一键扫描：创建 session → 自动调用 auto-scan API → 设置 scanning → 扫描完成后进入 scanned
   const handleCreateSession = async () => {
@@ -152,13 +157,14 @@ export default function SyncPanel({ initialSessionId }) {
     if (!sessionId) return;
     setSyncState(SYNC_STATES.scanning);
     setPushResult(null);  // 清除上次推送结果，让上传按钮重新显示
+    setSelections({});    // 立即清空勾选，不等 API 返回
+    setSelectAll(false);
     try {
       const scanRes = await apiClient.post(`/sync-sessions/${sessionId}/auto-scan`);
       const scanData = parseScanResult(scanRes.data.scan_result);
       setScanResult(scanData);
       setSyncState(SYNC_STATES.scanned);
       setSelections(buildSelections(scanData.items));
-      setSelectAll(false);
     } catch (err) {
       setError(err.message || '重新扫描失败');
       setSyncState(SYNC_STATES.scanned);
@@ -280,9 +286,86 @@ export default function SyncPanel({ initialSessionId }) {
         >
           开始扫描
         </Button>
-        <Typography variant="caption" sx={{ color: colors.textMuted, mt: 1, display: 'block', textAlign: 'center' }}>
-          服务端直接读取本地文件完成推送，无需 CLI
-        </Typography>
+
+        {/* 扫描规则说明 */}
+        <Accordion
+          defaultExpanded
+          sx={{ mt: 3, textAlign: 'left', border: `1px solid ${colors.border}`, '&:before': { display: 'none' } }}
+          disableGutters
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40, '& .MuiAccordionSummary-content': { my: 1 } }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: colors.textSecondary }}>
+              📋 扫描规则说明
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 0 }}>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 2, fontWeight: 500 }}>
+              自动扫描以下目录中的 Skill 和 Expert：
+            </Typography>
+
+            {/* 扫描路径表 */}
+            <Box sx={{ mb: 2 }}>
+              {[
+                { platform: 'Claude Code', skill: '~/.claude/commands/*.md', expert: '~/.claude/agents/*.md' },
+                { platform: 'Claude Code (cc-switch)', skill: '~/.claude/skills/*/index.md', expert: '—' },
+                { platform: 'Cursor', skill: '~/.cursor/rules/*.md', expert: '~/.cursor/prompts/*.md' },
+                { platform: 'WorkBuddy', skill: '~/.workbuddy/skills/', expert: '~/.workbuddy/experts/' },
+                { platform: 'Codex', skill: '~/.codex/commands/*.md', expert: '~/.codex/agents/*.md' },
+              ].map(row => (
+                <Box key={row.platform} sx={{
+                  display: 'flex', py: 0.6, borderBottom: `1px solid ${colors.border}`,
+                  '&:last-child': { borderBottom: 'none' },
+                }}>
+                  <Typography variant="caption" sx={{ width: 160, color: colors.textPrimary, fontWeight: 500 }}>
+                    {row.platform}
+                  </Typography>
+                  <Typography variant="caption" sx={{
+                    flex: 1, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: colors.textMuted,
+                  }}>
+                    {row.skill}
+                  </Typography>
+                  <Typography variant="caption" sx={{
+                    flex: 1, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: colors.textMuted,
+                  }}>
+                    {row.expert}
+                  </Typography>
+                </Box>
+              ))}
+              <Box sx={{ display: 'flex', pt: 0.5 }}>
+                <Typography variant="caption" sx={{ width: 160 }} />
+                <Typography variant="caption" sx={{ flex: 1, color: colors.textMuted, fontSize: '0.65rem' }}>Skill 路径</Typography>
+                <Typography variant="caption" sx={{ flex: 1, color: colors.textMuted, fontSize: '0.65rem' }}>Expert 路径</Typography>
+              </Box>
+            </Box>
+
+            {/* Expert 打包规则 */}
+            <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 1, fontWeight: 500 }}>
+              Expert 智能打包规则：
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: colors.textMuted, mb: 0.5, lineHeight: 1.6 }}>
+              ① 从 frontmatter <code style={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.04)', px: 0.5 }}>skills: [name1, name2]</code> 读取显式声明（优先）
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: colors.textMuted, mb: 0.5, lineHeight: 1.6 }}>
+              ② 兜底：正则匹配正文中的 <code style={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.04)', px: 0.5 }}>`/skill-name`</code> 引用
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: colors.textMuted, mb: 1.5, lineHeight: 1.6 }}>
+              ③ 在上述目录中搜索对应 Skill 文件，打包为 ZIP（prompt.md + skills/*.md + expert.yaml）
+            </Typography>
+
+            {/* 手动备选 */}
+            <Box sx={{
+              p: 1.5, bgcolor: 'rgba(255,102,0,0.04)', border: '1px solid rgba(255,102,0,0.15)', borderRadius: 1,
+            }}>
+              <Typography variant="caption" sx={{ color: colors.warning, fontWeight: 600, display: 'block', mb: 0.5 }}>
+                ⚠ 扫描不到你的资源？
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, lineHeight: 1.6 }}>
+                切换到「手动上传」模式，支持上传单个 .md 文件或 Expert ZIP 包。
+                也可以在 Expert 的 frontmatter 中添加 <code style={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.04)', px: 0.5 }}>skills: [skill-name]</code> 字段显式声明引用。
+              </Typography>
+            </Box>
+          </AccordionDetails>
+        </Accordion>
 
         {error && <Alert sx={{ mt: 2 }}>{error}</Alert>}
       </Paper>
@@ -336,9 +419,26 @@ export default function SyncPanel({ initialSessionId }) {
   if ((syncState === SYNC_STATES.scanned || syncState === SYNC_STATES.executing || syncState === SYNC_STATES.done) && scanResult) {
     const items = scanResult.items || [];
     const summary = scanResult.summary || {};
-    const newItems = items.filter(i => i.status === 'new');
-    const updatedItems = items.filter(i => i.status === 'updated');
-    const syncedItems = items.filter(i => i.status === 'synced');
+
+    // 搜索过滤：按名称匹配
+    const filterBySearch = (itemList) => {
+      if (!searchText.trim()) return itemList;
+      const q = searchText.trim().toLowerCase();
+      return itemList.filter(i =>
+        (i.displayName || i.name || '').toLowerCase().includes(q) ||
+        (i.platform || '').toLowerCase().includes(q) ||
+        (i.type || '').toLowerCase().includes(q)
+      );
+    };
+
+    const newItems = filterBySearch(items.filter(i => i.status === 'new'));
+    const updatedItems = filterBySearch(items.filter(i => i.status === 'updated'));
+    const syncedItems = filterBySearch(items.filter(i => i.status === 'synced'));
+
+    // 类型分布统计（跟随搜索过滤）
+    const filteredItems = filterBySearch(items);
+    const skillCount = filteredItems.filter(i => i.type === 'skill').length;
+    const expertCount = filteredItems.filter(i => i.type === 'expert').length;
 
     // 计算可勾选的 item 数量
     const selectableCount = newItems.length + updatedItems.length;
@@ -355,12 +455,44 @@ export default function SyncPanel({ initialSessionId }) {
           </Typography>
         </Box>
 
-        {/* 汇总统计 */}
-        <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
-          <Chip icon={<NewReleasesIcon />} label={`${summary.new || 0} 新增`} size="small" sx={{ bgcolor: 'rgba(16,185,129,0.08)', color: colors.success, fontWeight: 600 }} />
-          <Chip icon={<UpdateIcon />} label={`${summary.updated || 0} 有更新`} size="small" sx={{ bgcolor: 'rgba(255,165,0,0.08)', color: colors.warning, fontWeight: 600 }} />
-          <Chip icon={<CheckCircleIcon />} label={`${summary.synced || 0} 已同步`} size="small" sx={{ bgcolor: 'rgba(0,0,0,0.03)', color: colors.textMuted }} />
+        {/* 汇总统计（显示过滤后的数量） */}
+        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+          <Chip icon={<NewReleasesIcon />} label={`${newItems.length} 新增`} size="small" sx={{ bgcolor: 'rgba(16,185,129,0.08)', color: colors.success, fontWeight: 600 }} />
+          <Chip icon={<UpdateIcon />} label={`${updatedItems.length} 有更新`} size="small" sx={{ bgcolor: 'rgba(255,165,0,0.08)', color: colors.warning, fontWeight: 600 }} />
+          <Chip icon={<CheckCircleIcon />} label={`${syncedItems.length} 已同步`} size="small" sx={{ bgcolor: 'rgba(0,0,0,0.03)', color: colors.textMuted }} />
+          {skillCount > 0 && (
+            <Chip label={`🔧 技能 ${skillCount}`} size="small" sx={{ bgcolor: 'rgba(28,134,226,0.06)', color: '#1675CC', fontWeight: 600 }} />
+          )}
+          {expertCount > 0 && (
+            <Chip label={`🧠 专家 ${expertCount}`} size="small" sx={{ bgcolor: 'rgba(255,102,0,0.06)', color: '#E65C00', fontWeight: 600 }} />
+          )}
+          {searchText.trim() && (
+            <Chip label={`搜索: "${searchText.trim()}"`} size="small" onDelete={() => setSearchText('')} sx={{ bgcolor: 'rgba(28,134,226,0.06)', color: colors.primary }} />
+          )}
         </Box>
+
+        {/* 搜索过滤 */}
+        <TextField
+          size="small"
+          placeholder="搜索扫描结果（名称/平台/类型）..."
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: colors.textMuted, fontSize: 18 }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            mb: 2,
+            '& .MuiInputBase-root': {
+              fontSize: '0.85rem',
+              bgcolor: colors.bgWhite,
+            },
+          }}
+          fullWidth
+        />
 
         {/* 全选/全不选开关 */}
         {selectableCount > 0 && (
@@ -433,14 +565,14 @@ export default function SyncPanel({ initialSessionId }) {
                     <Typography variant="body2" sx={{ fontWeight: 600, color: colors.textPrimary }} noWrap>
                       {item.displayName || item.name}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: colors.textMuted }}>
-                      [{item.platform}] · {item.type} · {item.fileCount || 0} 个文件
+                    <Box sx={{ color: colors.textMuted, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                      [{item.platform}] · <TypeBadge type={item.type} size="small" /> · {item.fileCount || 0} 个文件
                       {item.bundledIn && (
                         <span style={{ color: colors.warning, marginLeft: 4 }}>
                           · 属于「{item.bundledIn.displayName}」
                         </span>
                       )}
-                    </Typography>
+                    </Box>
                     {item.description && (
                       <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: '0.78rem', mt: 0.5, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                         {item.description.length > 80 ? item.description.slice(0, 80) + '...' : item.description}
@@ -505,14 +637,14 @@ export default function SyncPanel({ initialSessionId }) {
                     <Typography variant="body2" sx={{ fontWeight: 600, color: colors.textPrimary }} noWrap>
                       {item.displayName || item.name}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: colors.textMuted }}>
-                      [{item.platform}] · {item.type} · 远端版本 v{item.remoteVersion || '?'}
+                    <Box sx={{ color: colors.textMuted, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                      [{item.platform}] · <TypeBadge type={item.type} size="small" /> · 远端版本 v{item.remoteVersion || '?'}
                       {item.bundledIn && (
                         <span style={{ color: colors.warning, marginLeft: 4 }}>
                           · 属于「{item.bundledIn.displayName}」
                         </span>
                       )}
-                    </Typography>
+                    </Box>
                     {item.description && (
                       <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: '0.78rem', mt: 0.5, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                         {item.description.length > 80 ? item.description.slice(0, 80) + '...' : item.description}
@@ -570,14 +702,14 @@ export default function SyncPanel({ initialSessionId }) {
                   <Typography variant="body2" sx={{ color: colors.textSecondary }} noWrap>
                     {item.displayName || item.name}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: colors.textMuted }}>
-                    [{item.platform}] · {item.type} · v{item.remoteVersion || '?'}
+                  <Box sx={{ color: colors.textMuted, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                    [{item.platform}] · <TypeBadge type={item.type} size="small" /> · v{item.remoteVersion || '?'}
                     {item.bundledIn && (
                       <span style={{ color: colors.warning, marginLeft: 4 }}>
                         · 属于「{item.bundledIn.displayName}」
                       </span>
                     )}
-                  </Typography>
+                  </Box>
                   {item.description && (
                     <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: '0.78rem', mt: 0.5, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                       {item.description.length > 80 ? item.description.slice(0, 80) + '...' : item.description}
@@ -678,9 +810,22 @@ export default function SyncPanel({ initialSessionId }) {
                         {item.displayName || item.name}
                       </Typography>
                       {item.success ? (
-                        <Typography variant="caption" sx={{ color: colors.textMuted }}>
-                          {item.action}{item.version ? ` → v${item.version}` : ''}
-                        </Typography>
+                        <Box>
+                          <Typography variant="caption" sx={{ color: colors.textMuted }}>
+                            {item.action}{item.version ? ` → v${item.version}` : ''}
+                          </Typography>
+                          {/* Expert Skill 打包反馈 */}
+                          {item.bundledSkills?.length > 0 && (
+                            <Typography variant="caption" sx={{ display: 'block', color: colors.success, fontSize: '0.7rem' }}>
+                              ✅ 已打包 {item.bundledSkills.length} 个 Skill: {item.bundledSkills.join(', ')}
+                            </Typography>
+                          )}
+                          {item.unbundledSkills?.length > 0 && (
+                            <Typography variant="caption" sx={{ display: 'block', color: colors.warning, fontSize: '0.7rem' }}>
+                              ⚠ 未找到 {item.unbundledSkills.length} 个 Skill: {item.unbundledSkills.join(', ')}
+                            </Typography>
+                          )}
+                        </Box>
                       ) : (
                         <Typography variant="caption" sx={{ color: colors.danger }}>
                           {item.error}
