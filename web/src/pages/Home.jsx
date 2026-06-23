@@ -77,15 +77,15 @@ export default function Home() {
             gap: 1,
           }}
         >
-          <TerminalIcon sx={{ fontSize: 16, color: colors.textMuted }} />
-          <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+          <TerminalIcon sx={{ fontSize: 16, color: colors.primary }} />
+          <Typography variant="body2" sx={{ color: colors.textPrimary, fontWeight: 500 }}>
             还没安装 skhub CLI？
           </Typography>
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
-              bgcolor: 'rgba(0,0,0,0.05)',
+              bgcolor: colors.bgWhite,
               px: 1.5,
               py: 0.5,
               borderRadius: 1,
