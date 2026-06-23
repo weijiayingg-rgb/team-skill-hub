@@ -8,7 +8,7 @@
  *   ④ 仅有 expert.yaml + prompt.md（无 skills/ 子目录）
  *   ⑤ 损坏的 expert.yaml → 仍然 valid，skillRefs=[]
  *
- * 跑：cd /Users/zcy/AgentHub/server && node --test __tests__/services/parseExpertZip.test.js
+ * 跑：cd ./server && node --test __tests__/services/parseExpertZip.test.js
  */
 
 const test = require('node:test');

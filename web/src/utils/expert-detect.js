@@ -5,8 +5,8 @@
  * 底层逻辑在 `shared/expert-rules.js`（CommonJS，CLI/Server 直接 require）。
  * Web 端必须用 .mjs 版本，因为 Rollup 生产构建不支持从 CJS 做命名导入。
  *
- * @see /Users/zcy/AgentHub/shared/expert-rules.mjs
- * @see /Users/zcy/AgentHub/shared/expert-rules.js
+ * @see ./shared/expert-rules.mjs
+ * @see ./shared/expert-rules.js
  */
 
 import { parseFrontmatter, parseSkillRefs, looksLikeExpert } from '@shared/expert-rules.mjs';

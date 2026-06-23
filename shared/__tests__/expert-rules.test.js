@@ -1,7 +1,7 @@
 /**
  * shared/expert-rules 单元测试
  *
- * 跑：cd /Users/zcy/AgentHub && node --test shared/__tests__/expert-rules.test.js
+ * 跑：cd . && node --test shared/__tests__/expert-rules.test.js
  *
  * 覆盖规则单一来源的关键路径：
  *   - frontmatter 解析（含 CRLF / 引号 / 列表两种格式）
